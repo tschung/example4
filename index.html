@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 센서 통계분석 대시보드 | Smart Sensor Analytics Studio</title>
+    
+    <!-- 폰트 및 아이콘 CDN 선탑재 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
+    <!-- 핵심 라이브러리 CDN 초기 선탑재 (클라이언트 메모리 연산) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- 자체 스타일시트 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-theme="dark">
+
+    <!-- 상단 헤더 바 -->
+    <header class="app-header">
+        <div class="logo-group">
+            <div class="logo-badge">
+                <i class="fa-solid fa-chart-line" style="color: #ffffff;"></i>
+            </div>
+            <div class="logo-text">
+                <h1>Smart Sensor Analytics Studio</h1>
+                <span>원클릭 다차원 통계분석 & 실시간 시각화 대시보드</span>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <div class="privacy-badge" title="모든 데이터는 서버로 전송되지 않고 브라우저 메모리 안에서만 안전하게 처리됩니다.">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>100% 클라이언트 보안 메모리 처리</span>
+            </div>
+            <button id="themeToggleBtn" class="theme-toggle-btn">
+                <i class="fa-solid fa-moon"></i> 다크 모드
+            </button>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <main class="app-container">
+        <!-- 상단 업로드 및 데이터 메타 현황 카드 -->
+        <section class="upload-section">
+            <div class="drop-zone" id="dropZone">
+                <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                <div class="drop-text">
+                    <strong>분석할 엑셀 파일(.xlsx, .xls)을 이곳에 끌어다 놓으세요</strong>
+                    <p>또는 로컬 파일을 직접 선택하거나, 기본 제공되는 더미 데이터를 즉시 불러올 수 있습니다.</p>
+                </div>
+                <div class="btn-group-load">
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click();">
+                        <i class="fa-solid fa-folder-open"></i> 파일 찾아보기
+                    </button>
+                    <button class="btn btn-secondary" id="loadDefaultBtn">
+                        <i class="fa-solid fa-rotate-right"></i> 더미 데이터 로드 (sensor_sample_data_100.xlsx)
+                    </button>
+                </div>
+                <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;">
+            </div>
+
+            <div class="quick-stats-card">
+                <div class="meta-header">
+                    <div>
+                        <h2>데이터셋 정보</h2>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);" id="metaFilename">데이터 없음</span>
+                    </div>
+                    <span class="meta-badge">Memory Loaded</span>
+                </div>
+
+                <div class="stat-pills">
+                    <div class="stat-pill">
+                        <div class="stat-pill-label">총 데이터 행</div>
+                        <div class="stat-pill-value" id="metaRowCount">-</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-pill-label">총 컬럼 수</div>
+                        <div class="stat-pill-value" id="metaColCount">-</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-pill-label">수치형 변수</div>
+                        <div class="stat-pill-value" id="metaNumericColCount">-</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-pill-label">결측치(Missing)</div>
+                        <div class="stat-pill-value" id="metaMissingCount">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 분석 기능 탭 메뉴 -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="tab-overview">
+                <i class="fa-solid fa-table-list"></i> 원본 데이터 프리뷰
+            </button>
+            <button class="tab-btn" data-tab="tab-descriptive">
+                <i class="fa-solid fa-calculator"></i> 기술통계량 요약
+            </button>
+            <button class="tab-btn" data-tab="tab-timeseries">
+                <i class="fa-solid fa-wave-square"></i> 시계열 트렌드 모니터링
+            </button>
+            <button class="tab-btn" data-tab="tab-sensor-error">
+                <i class="fa-solid fa-temperature-arrow-up"></i> 센서 오차 및 잔차 분석
+            </button>
+            <button class="tab-btn" data-tab="tab-correlation">
+                <i class="fa-solid fa-diagram-project"></i> 상관분석 (Heatmap)
+            </button>
+            <button class="tab-btn" data-tab="tab-regression">
+                <i class="fa-solid fa-chart-line"></i> 단순 선형 회귀분석
+            </button>
+            <button class="tab-btn" data-tab="tab-hypothesis">
+                <i class="fa-solid fa-scale-balanced"></i> 가설검정 (t-Test / ANOVA)
+            </button>
+            <button class="tab-btn" data-tab="tab-anomaly">
+                <i class="fa-solid fa-triangle-exclamation"></i> 3-Sigma 관리도 및 이상치
+            </button>
+        </nav>
+
+        <!-- 1. 원본 데이터 프리뷰 탭 -->
+        <section id="tab-overview" class="tab-content active">
+            <div class="card">
+                <div class="card-title">
+                    <span><i class="fa-solid fa-table"></i> 원시 데이터 미리보기 (상위 50행)</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">결측치 및 이벤트 태그 자동 강조</span>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead id="previewTableHead"></thead>
+                        <tbody id="previewTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 기술통계량 요약 탭 -->
+        <section id="tab-descriptive" class="tab-content">
+            <div class="card">
+                <div class="control-bar">
+                    <div class="control-item">
+                        <label for="descVarSelect"><i class="fa-solid fa-filter"></i> 분석 대상 수치형 변수:</label>
+                        <select id="descVarSelect"></select>
+                    </div>
+                </div>
+
+                <div class="metric-row" id="statsSummaryCards"></div>
+
+                <div class="grid-2">
+                    <div class="card" style="padding: 1rem;">
+                        <h3 class="card-title">히스토그램 & 데이터 분포</h3>
+                        <div class="chart-box">
+                            <canvas id="descHistChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card" style="padding: 1rem;">
+                        <h3 class="card-title">모든 수치형 변수 기술통계량 비교표</h3>
+                        <div class="table-wrapper" style="max-height: 380px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>변수명</th>
+                                        <th>N</th>
+                                        <th>평균</th>
+                                        <th>중앙값</th>
+                                        <th>표준편차</th>
+                                        <th>최소</th>
+                                        <th>최대</th>
+                                        <th>Q1</th>
+                                        <th>Q3</th>
+                                        <th>IQR</th>
+                                        <th>왜도</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="allDescTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 시계열 트렌드 모니터링 탭 -->
+        <section id="tab-timeseries" class="tab-content">
+            <div class="card">
+                <div class="card-title">
+                    <span><i class="fa-solid fa-chart-area"></i> 센서 시계열 다축 트렌드 모니터링</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">측정시각 기준 센서별 실시간 변동 양상</span>
+                </div>
+                <div class="chart-box" style="height: 480px;">
+                    <canvas id="timeSeriesChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 센서 오차 및 잔차 분석 탭 -->
+        <section id="tab-sensor-error" class="tab-content">
+            <div class="card" id="sensorErrorContent">
+                <div class="card-title">
+                    <span><i class="fa-solid fa-vial-circle-check"></i> 온도 센서 원시값 vs 참값(기준값) 정밀도 검증</span>
+                </div>
+                <div class="metric-row" id="sensorErrorMetrics"></div>
+                <div id="sensorErrorTTest" style="margin-bottom: 1rem;"></div>
+                <div class="chart-box" style="height: 400px;">
+                    <canvas id="sensorResidualChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. 상관분석 탭 -->
+        <section id="tab-correlation" class="tab-content">
+            <div class="card">
+                <div class="card-title">
+                    <span><i class="fa-solid fa-border-all"></i> 피어슨 상관계수 매트릭스 (Pearson Correlation Matrix)</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">표의 셀을 클릭하면 하단 산점도가 즉시 업데이트됩니다.</span>
+                </div>
+                <div class="table-wrapper" id="correlationTableContainer" style="margin-bottom: 1.25rem;"></div>
+
+                <div class="card" style="padding: 1rem;">
+                    <h3 class="card-title" id="corrPairTitle">상관 산점도 및 추세선</h3>
+                    <div class="chart-box">
+                        <canvas id="corrScatterChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. 단순 선형 회귀분석 탭 -->
+        <section id="tab-regression" class="tab-content">
+            <div class="card">
+                <div class="control-bar">
+                    <div class="control-item">
+                        <label for="regXSelect">독립변수 (X):</label>
+                        <select id="regXSelect"></select>
+                    </div>
+                    <div class="control-item">
+                        <label for="regYSelect">종속변수 (Y):</label>
+                        <select id="regYSelect"></select>
+                    </div>
+                </div>
+
+                <div class="metric-row" id="regMetrics"></div>
+
+                <div class="chart-box" style="height: 440px;">
+                    <canvas id="regressionChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. 가설검정 탭 -->
+        <section id="tab-hypothesis" class="tab-content">
+            <div class="card">
+                <div class="control-bar">
+                    <div class="control-item">
+                        <label for="testTypeSelect">검정 기법 선택:</label>
+                        <select id="testTypeSelect">
+                            <option value="two-sample-t">독립 2표본 t-검정 (Welch's t-test)</option>
+                            <option value="anova">일원배치 분산분석 (One-way ANOVA)</option>
+                        </select>
+                    </div>
+                    <div class="control-item">
+                        <label for="ttestVarSelect">분석 변수 (수치형):</label>
+                        <select id="ttestVarSelect"></select>
+                    </div>
+                    <div class="control-item">
+                        <label for="ttestGroupSelect">그룹 변수 (범주형):</label>
+                        <select id="ttestGroupSelect"></select>
+                    </div>
+                </div>
+
+                <div id="hypothesisResultContainer"></div>
+            </div>
+        </section>
+
+        <!-- 8. 3-Sigma 관리도 및 이상치 탐지 탭 -->
+        <section id="tab-anomaly" class="tab-content">
+            <div class="card">
+                <div class="control-bar">
+                    <div class="control-item">
+                        <label for="anomalyVarSelect">모니터링 변수:</label>
+                        <select id="anomalyVarSelect"></select>
+                    </div>
+                    <div class="control-item">
+                        <label for="zScoreThreshold">Z-Score 이상치 임계값 (|Z|):</label>
+                        <select id="zScoreThreshold">
+                            <option value="2.0">2.0 (민감한 감지 - 95.4%)</option>
+                            <option value="2.5" selected>2.5 (권장 표준 감지 - 98.7%)</option>
+                            <option value="3.0">3.0 (엄격한 감지 / 3-시그마 - 99.7%)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="metric-row" id="anomalyMetrics"></div>
+
+                <div class="grid-2">
+                    <div class="chart-box" style="height: 420px;">
+                        <canvas id="controlChart"></canvas>
+                    </div>
+                    <div class="table-wrapper" style="height: 420px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>행 #</th>
+                                    <th>시각</th>
+                                    <th>측정 수치</th>
+                                    <th>Z-Score</th>
+                                    <th>상태 / 이벤트</th>
+                                </tr>
+                            </thead>
+                            <tbody id="anomalyTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer>
+        <p>© 2026 Smart Sensor Analytics Studio | Zero-Server Pure Client-Side Statistical Computing Engine</p>
+    </footer>
+
+    <!-- 자바스크립트 로직 로드 -->
+    <script src="js/default-data.js"></script>
+    <script src="js/stats-engine.js"></script>
+    <script src="js/chart-manager.js"></script>
+    <script src="js/excel-parser.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
